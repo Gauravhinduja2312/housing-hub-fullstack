@@ -9,11 +9,10 @@ services:
     envVars:
       - key: JWT_SECRET
         generateValue: true
-      # You will add your MONGODB_URI, Cloudinary, and SendGrid keys in the dashboard later
 
-staticSites:
   # Frontend Static Site (React)
-  - name: housing-hub-frontend
+  - type: static
+    name: housing-hub-frontend
     rootDir: housing-hub-project
     buildCommand: npm run build
     publishDir: build
