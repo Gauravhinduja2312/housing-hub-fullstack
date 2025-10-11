@@ -4,17 +4,16 @@ services:
     name: housing-hub-backend
     runtime: docker
     rootDir: housing-hub-backend1
-    plan: free # This line is the fix for the payment issue
+    plan: free
     healthCheckPath: /api/properties
     envVars:
-      - key: MONGODB_URI # We will add the actual value in the dashboard
       - key: JWT_SECRET
-        generateValue: true # Let Render generate a secure secret for you
-      # Note: You will add your Cloudinary and SendGrid keys in the dashboard
+        generateValue: true
+      # You will add your MONGODB_URI, Cloudinary, and SendGrid keys in the dashboard later
 
+staticSites:
   # Frontend Static Site (React)
-  - type: static
-    name: housing-hub-frontend
+  - name: housing-hub-frontend
     rootDir: housing-hub-project
     buildCommand: npm run build
     publishDir: build
@@ -22,3 +21,9 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+    envVars:
+      - key: REACT_APP_API_URL
+        fromService:
+          type: web
+          name: housing-hub-backend
+          property: url
