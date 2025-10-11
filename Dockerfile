@@ -2,13 +2,17 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 
-# MODIFIED: Copy package files explicitly
+# --- DEBUGGING STEP ---
+# List the contents of the repository root to see what Docker sees
+RUN ls -la
+
+# Copy package files
 COPY housing-hub-backend1/package.json ./
 COPY housing-hub-backend1/package-lock.json ./
 
 RUN npm install
 
-# MODIFIED: Copy the rest of the backend source code
+# Copy the rest of the backend source code
 COPY housing-hub-backend1/. .
 
 
