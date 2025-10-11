@@ -2,8 +2,9 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 
-# MODIFIED: Copy package files from the backend sub-directory
-COPY housing-hub-backend1/package*.json ./
+# MODIFIED: Copy package files explicitly
+COPY housing-hub-backend1/package.json ./
+COPY housing-hub-backend1/package-lock.json ./
 
 RUN npm install
 
