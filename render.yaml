@@ -3,3 +3,4 @@ services:
     name: housing-hub-backend
     runtime: docker
     rootDir: housing-hub-backend1
+    dockerfilePath: Dockerfile
