@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, Outlet, useLocation } from 'react-router-dom';
 import { Home, LogIn, UserPlus, Building, Menu, X, PlusCircle, House, MapPin, DollarSign, Bed, Bath, Tag, Image, Search, Filter, ArrowLeft, Edit, Trash2, MessageSquare, Send, Heart, Star, LayoutDashboard, Eye } from 'lucide-react';
-import api, { WEBSOCKET_URL } from './api'; // Import the new api instance
+import api, { WEBSOCKET_URL } from './api'; // Import our new api instance and WebSocket URL
 
 // --- Auth Context ---
 const AuthContext = createContext();
@@ -95,66 +95,50 @@ const Navbar = () => {
 };
 
 // --- App Layout Component ---
-const AppLayout = () => {
-    return (
-        <div className="font-['Inter'] antialiased">
-            <Navbar />
-            <main>
-                <Outlet />
-            </main>
-        </div>
-    );
-};
+const AppLayout = () => (
+    <div className="font-['Inter'] antialiased">
+        <Navbar />
+        <main><Outlet /></main>
+    </div>
+);
 
 // --- Helper Components ---
-const MapView = ({ properties }) => {
-    return (
-        <div className="h-[400px] w-full mb-8 rounded-2xl shadow-xl border overflow-hidden flex items-center justify-center bg-gray-100">
-            <p className="text-gray-500">Map functionality is currently unavailable.</p>
-        </div>
-    );
-};
-const StarRating = ({ rating, setRating, isInteractive = true }) => {
-    return (
-        <div className="flex items-center space-x-1">
-            {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                    key={star}
-                    className={`cursor-pointer ${rating >= star ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-                    onClick={() => isInteractive && setRating(star)}
-                />
-            ))}
-        </div>
-    );
-};
+const MapView = ({ properties }) => (
+    <div className="h-[400px] w-full mb-8 rounded-2xl shadow-xl border overflow-hidden flex items-center justify-center bg-gray-100">
+        <p className="text-gray-500">Map functionality is currently unavailable.</p>
+    </div>
+);
+
+const StarRating = ({ rating, setRating, isInteractive = true }) => (
+    <div className="flex items-center space-x-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+            <Star
+                key={star}
+                className={`cursor-pointer ${rating >= star ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+                onClick={() => isInteractive && setRating(star)}
+            />
+        ))}
+    </div>
+);
 
 // --- Page Components ---
-
 const HomeView = () => {
     const { currentUser } = useAuth();
     const navigate = useNavigate();
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl w-full bg-white p-12 rounded-2xl shadow-2xl border border-gray-200 text-center">
-                <h1 className="text-5xl font-extrabold text-gray-800 mb-4">
-                    Welcome to <span className="text-indigo-600">Housing Hub</span>
-                </h1>
-                <p className="text-xl text-gray-600 mb-8">
-                    Your one-step solution for finding the perfect student accommodation.
-                </p>
+                <h1 className="text-5xl font-extrabold text-gray-800 mb-4">Welcome to <span className="text-indigo-600">Housing Hub</span></h1>
+                <p className="text-xl text-gray-600 mb-8">Your one-stop solution for finding the perfect student accommodation.</p>
                 {currentUser ? (
                     <div>
                         <p className="text-xl text-gray-700 mb-2">You are logged in as <span className="font-bold text-indigo-700">{currentUser.email}</span>.</p>
                         <p className="text-lg text-gray-600 mb-2">User Type: <span className="font-semibold capitalize">{currentUser.userType}</span></p>
                         <p className="text-sm text-gray-500 mb-8">Your User ID: {currentUser.uid}</p>
                         {currentUser.userType === 'landlord' ? (
-                            <button onClick={() => navigate('/add-property')} className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105">
-                                <PlusCircle className="inline-block mr-2" />Post a New Property
-                            </button>
+                            <button onClick={() => navigate('/add-property')} className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105"><PlusCircle className="inline-block mr-2" />Post a New Property</button>
                         ) : (
-                            <button onClick={() => navigate('/properties')} className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105">
-                                <House className="inline-block mr-2" />View Available Properties
-                            </button>
+                            <button onClick={() => navigate('/properties')} className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105"><House className="inline-block mr-2" />View Available Properties</button>
                         )}
                         <div className="mt-8 p-4 bg-blue-50 rounded-xl text-blue-800 border border-blue-200">
                             <p className="font-semibold">Data Persistence Note:</p>
@@ -163,9 +147,7 @@ const HomeView = () => {
                     </div>
                 ) : (
                     <div>
-                        <p className="text-lg text-gray-600 mb-8">
-                            Please <Link to="/login" className="text-indigo-600 font-semibold hover:underline">Login</Link> or <Link to="/signup" className="text-green-600 font-semibold hover:underline">Sign Up</Link> to explore properties and manage your listings.
-                        </p>
+                        <p className="text-lg text-gray-600 mb-8">Please <Link to="/login" className="text-indigo-600 font-semibold hover:underline">Login</Link> or <Link to="/signup" className="text-green-600 font-semibold hover:underline">Sign Up</Link> to explore properties and manage your listings.</p>
                         <div className="flex justify-center space-x-4">
                             <button onClick={() => navigate('/login')} className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105"><LogIn className="inline-block mr-2" />Login</button>
                             <button onClick={() => navigate('/signup')} className="bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105"><UserPlus className="inline-block mr-2" size={20} />Sign Up</button>
@@ -176,6 +158,7 @@ const HomeView = () => {
         </div>
     );
 };
+
 const Login = () => {
     const { setCurrentUser } = useAuth();
     const navigate = useNavigate();
@@ -190,7 +173,6 @@ const Login = () => {
         try {
             const response = await api.post("/api/login", { email, password });
             const data = response.data;
-            
             const userToStore = { email: data.email, uid: data.userId, userType: data.userType };
             setCurrentUser(userToStore);
             localStorage.setItem("token", data.token);
@@ -217,6 +199,7 @@ const Login = () => {
         </div>
     );
 };
+
 const Signup = () => {
     const navigate = useNavigate();
     const { setCurrentUser } = useAuth();
@@ -252,8 +235,10 @@ const Signup = () => {
         setError('');
         setLoading(true);
         try {
-            const response = await api.post("/api/verify-otp", { email, otp, password, userType });
+            // The backend /api/verify-otp route only needs email and otp
+            const response = await api.post("/api/verify-otp", { email, otp });
             const data = response.data;
+
             const userToStore = { email: data.email, uid: data.userId, userType: data.userType };
             setCurrentUser(userToStore);
             localStorage.setItem("token", data.token);
@@ -302,6 +287,7 @@ const Signup = () => {
         </div>
     );
 };
+
 const PropertiesView = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
@@ -495,10 +481,12 @@ const PropertyDetailsView = () => {
         }
     }, [propertyId]);
 
+
     const handleReviewSubmit = async (e) => {
         e.preventDefault();
         try {
             await api.post('/api/reviews', { property_id: propertyId, rating: newRating, comment: newReviewText });
+            // Re-fetch after submitting
             const revResponse = await api.get(`/api/properties/${propertyId}/reviews`);
             setReviews(revResponse.data);
             setNewReviewText("");
@@ -759,13 +747,13 @@ const MessagesView = () => {
             } catch (err) { setError(err.response?.data?.message || 'Failed to fetch conversations.'); }
             finally { setLoading(false); }
         };
-        if(currentUser) fetchConversations();
+        if (currentUser) fetchConversations();
     }, [conversationId, currentUser]);
 
     useEffect(() => {
         if (!selectedConversation) return;
         fetchMessages(selectedConversation._id);
-        ws.current = new WebSocket(WEBSOCKET_URL);
+        ws.current = new WebSocket(WEBSOCKET_URL); // Using the dynamic URL
         ws.current.onopen = () => {
             const token = localStorage.getItem("token");
             ws.current.send(JSON.stringify({ type: 'auth', token, conversationId: selectedConversation._id }));
@@ -843,6 +831,7 @@ const MessagesView = () => {
         </div>
     );
 };
+
 const FavoritesView = () => {
     const { currentUser } = useAuth();
     const [favoriteProperties, setFavoriteProperties] = useState([]);
@@ -892,6 +881,7 @@ const FavoritesView = () => {
         </div>
     );
 };
+
 const DashboardView = () => {
     const { currentUser, loading } = useAuth();
     const navigate = useNavigate();
@@ -1000,6 +990,4 @@ const App = () => {
     );
 }
 
-// I have renamed the main component export to avoid conflicts
-// and wrapped it in the AuthProvider and BrowserRouter
-// You should ensure this is the main entry point of your app.
+export default App;
