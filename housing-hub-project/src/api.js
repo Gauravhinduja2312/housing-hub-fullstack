@@ -26,3 +26,4 @@ api.interceptors.request.use(
 export const WEBSOCKET_URL = API_URL.replace(/^http/, 'ws');
 
 export default api;
+
