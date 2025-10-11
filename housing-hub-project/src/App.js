@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, Outlet } from 'react-router-dom';
 import { Home, LogIn, UserPlus, Building, Menu, X, PlusCircle, House, MapPin, DollarSign, Bed, Bath, Tag, Image, Search, Filter, ArrowLeft, Edit, Trash2, MessageSquare, Send, Heart, Star, LayoutDashboard, Eye } from 'lucide-react';
+import api, { WEBSOCKET_URL } from './api'; // Import the new api instance and WebSocket URL
 
 // --- Auth Context ---
 const AuthContext = createContext();
@@ -27,18 +28,13 @@ export const AuthProvider = ({ children }) => {
         }
     }, [currentUser]);
 
-    const getAuthHeaders = useCallback(() => {
-        const token = localStorage.getItem("token");
-        if (token) return { Authorization: `Bearer ${token}` };
-        return {};
-    }, []);
-
     const logout = () => {
         setCurrentUser(null);
     };
 
+    // The getAuthHeaders function is no longer needed, as the api.js interceptor handles it.
     return (
-        <AuthContext.Provider value={{ currentUser, setCurrentUser, getAuthHeaders, logout, loading }}>
+        <AuthContext.Provider value={{ currentUser, setCurrentUser, logout, loading }}>
             {!loading && children}
         </AuthContext.Provider>
     );
@@ -51,14 +47,11 @@ const Navbar = () => {
     const { currentUser, logout } = useAuth();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const navigate = useNavigate();
-
     const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
-
     const handleLogout = () => {
         logout();
         navigate('/');
     };
-
     return (
         <nav className="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 shadow-lg sticky top-0 z-50 rounded-b-xl">
             <div className="container mx-auto flex justify-between items-center flex-wrap">
@@ -100,66 +93,50 @@ const Navbar = () => {
 };
 
 // --- App Layout Component ---
-const AppLayout = () => {
-    return (
-        <div className="font-['Inter'] antialiased">
-            <Navbar />
-            <main>
-                <Outlet />
-            </main>
-        </div>
-    );
-};
+const AppLayout = () => (
+    <div className="font-['Inter'] antialiased">
+        <Navbar />
+        <main><Outlet /></main>
+    </div>
+);
 
 // --- Helper Components ---
-const MapView = ({ properties }) => {
-    return (
-        <div className="h-[400px] w-full mb-8 rounded-2xl shadow-xl border overflow-hidden flex items-center justify-center bg-gray-100">
-            <p className="text-gray-500">Map functionality is currently unavailable.</p>
-        </div>
-    );
-};
-const StarRating = ({ rating, setRating, isInteractive = true }) => {
-    return (
-        <div className="flex items-center space-x-1">
-            {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                    key={star}
-                    className={`cursor-pointer ${rating >= star ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-                    onClick={() => isInteractive && setRating(star)}
-                />
-            ))}
-        </div>
-    );
-};
+const MapView = ({ properties }) => (
+    <div className="h-[400px] w-full mb-8 rounded-2xl shadow-xl border overflow-hidden flex items-center justify-center bg-gray-100">
+        <p className="text-gray-500">Map functionality is currently unavailable.</p>
+    </div>
+);
+
+const StarRating = ({ rating, setRating, isInteractive = true }) => (
+    <div className="flex items-center space-x-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+            <Star
+                key={star}
+                className={`cursor-pointer ${rating >= star ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+                onClick={() => isInteractive && setRating(star)}
+            />
+        ))}
+    </div>
+);
 
 // --- Page Components ---
-
 const HomeView = () => {
     const { currentUser } = useAuth();
     const navigate = useNavigate();
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl w-full bg-white p-12 rounded-2xl shadow-2xl border border-gray-200 text-center">
-                <h1 className="text-5xl font-extrabold text-gray-800 mb-4">
-                    Welcome to <span className="text-indigo-600">Housing Hub</span>
-                </h1>
-                <p className="text-xl text-gray-600 mb-8">
-                    Your one-step solution for finding the perfect student accommodation.
-                </p>
+                <h1 className="text-5xl font-extrabold text-gray-800 mb-4">Welcome to <span className="text-indigo-600">Housing Hub</span></h1>
+                <p className="text-xl text-gray-600 mb-8">Your one-step solution for finding the perfect student accommodation.</p>
                 {currentUser ? (
                     <div>
                         <p className="text-xl text-gray-700 mb-2">You are logged in as <span className="font-bold text-indigo-700">{currentUser.email}</span>.</p>
                         <p className="text-lg text-gray-600 mb-2">User Type: <span className="font-semibold capitalize">{currentUser.userType}</span></p>
                         <p className="text-sm text-gray-500 mb-8">Your User ID: {currentUser.uid}</p>
                         {currentUser.userType === 'landlord' ? (
-                            <button onClick={() => navigate('/add-property')} className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105">
-                                <PlusCircle className="inline-block mr-2" />Post a New Property
-                            </button>
+                            <button onClick={() => navigate('/add-property')} className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105"><PlusCircle className="inline-block mr-2" />Post a New Property</button>
                         ) : (
-                            <button onClick={() => navigate('/properties')} className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105">
-                                <House className="inline-block mr-2" />View Available Properties
-                            </button>
+                            <button onClick={() => navigate('/properties')} className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105"><House className="inline-block mr-2" />View Available Properties</button>
                         )}
                         <div className="mt-8 p-4 bg-blue-50 rounded-xl text-blue-800 border border-blue-200">
                             <p className="font-semibold">Data Persistence Note:</p>
@@ -168,9 +145,7 @@ const HomeView = () => {
                     </div>
                 ) : (
                     <div>
-                        <p className="text-lg text-gray-600 mb-8">
-                            Please <Link to="/login" className="text-indigo-600 font-semibold hover:underline">Login</Link> or <Link to="/signup" className="text-green-600 font-semibold hover:underline">Sign Up</Link> to explore properties and manage your listings.
-                        </p>
+                        <p className="text-lg text-gray-600 mb-8">Please <Link to="/login" className="text-indigo-600 font-semibold hover:underline">Login</Link> or <Link to="/signup" className="text-green-600 font-semibold hover:underline">Sign Up</Link> to explore properties and manage your listings.</p>
                         <div className="flex justify-center space-x-4">
                             <button onClick={() => navigate('/login')} className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105"><LogIn className="inline-block mr-2" />Login</button>
                             <button onClick={() => navigate('/signup')} className="bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105"><UserPlus className="inline-block mr-2" size={20} />Sign Up</button>
@@ -181,6 +156,7 @@ const HomeView = () => {
         </div>
     );
 };
+
 const Login = () => {
     const { setCurrentUser } = useAuth();
     const navigate = useNavigate();
@@ -193,20 +169,14 @@ const Login = () => {
         e.preventDefault();
         setError(""); setLoading(true);
         try {
-            const response = await fetch("http://localhost:3001/api/login", {
-                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                const userToStore = { email: data.email, uid: data.userId, userType: data.userType };
-                setCurrentUser(userToStore);
-                localStorage.setItem("token", data.token);
-                navigate("/");
-            } else {
-                setError(data.message || "Invalid email or password.");
-            }
+            const response = await api.post("/api/login", { email, password });
+            const data = response.data;
+            const userToStore = { email: data.email, uid: data.userId, userType: data.userType };
+            setCurrentUser(userToStore);
+            localStorage.setItem("token", data.token);
+            navigate("/");
         } catch (err) {
-            setError("Network error. Please try again later.");
+            setError(err.response?.data?.message || "Network error. Please try again later.");
         } finally {
             setLoading(false);
         }
@@ -227,6 +197,7 @@ const Login = () => {
         </div>
     );
 };
+
 const Signup = () => {
     const navigate = useNavigate();
     const { setCurrentUser } = useAuth();
@@ -248,16 +219,10 @@ const Signup = () => {
         }
         setLoading(true);
         try {
-            const response = await fetch("http://localhost:3001/api/signup", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password, userType }),
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Failed to send OTP.');
+            await api.post("/api/signup", { email, password, userType });
             setSignupStep(2);
         } catch (err) {
-            setError(err.message);
+            setError(err.response?.data?.message || 'Failed to send OTP.');
         } finally {
             setLoading(false);
         }
@@ -268,21 +233,14 @@ const Signup = () => {
         setError('');
         setLoading(true);
         try {
-            const response = await fetch("http://localhost:3001/api/verify-otp", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, otp, password, userType }),
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'OTP verification failed.');
-
+            const response = await api.post("/api/verify-otp", { email, otp, password, userType });
+            const data = response.data;
             const userToStore = { email: data.email, uid: data.userId, userType: data.userType };
             setCurrentUser(userToStore);
             localStorage.setItem("token", data.token);
             navigate("/");
-
         } catch (err) {
-            setError(err.message);
+            setError(err.response?.data?.message || 'OTP verification failed.');
         } finally {
             setLoading(false);
         }
@@ -324,9 +282,10 @@ const Signup = () => {
         </div>
     );
 };
+
 const PropertiesView = () => {
     const navigate = useNavigate();
-    const { currentUser, getAuthHeaders } = useAuth();
+    const { currentUser } = useAuth();
     const [properties, setProperties] = useState([]);
     const [favorites, setFavorites] = useState(new Set());
     const [loading, setLoading] = useState(true);
@@ -342,23 +301,19 @@ const PropertiesView = () => {
     const fetchPropertiesAndFavorites = useCallback(async () => {
         setLoading(true);
         try {
-            const propsResponse = await fetch('http://localhost:3001/api/properties');
-            const propsData = await propsResponse.json();
-            if (!propsResponse.ok) throw new Error(propsData.message || 'Failed to fetch properties');
-            setProperties(propsData);
+            const propsResponse = await api.get('/api/properties');
+            setProperties(propsResponse.data);
 
             if (currentUser && currentUser.userType === 'student') {
-                const favsResponse = await fetch('http://localhost:3001/api/favorites', { headers: getAuthHeaders() });
-                const favsData = await favsResponse.json();
-                if (!favsResponse.ok) throw new Error(favsData.message || 'Failed to fetch favorites');
-                setFavorites(new Set(favsData.map(fav => fav._id)));
+                const favsResponse = await api.get('/api/favorites');
+                setFavorites(new Set(favsResponse.data.map(fav => fav._id)));
             }
         } catch (err) {
-            setError(err.message);
+            setError(err.response?.data?.message || 'Failed to fetch data.');
         } finally {
             setLoading(false);
         }
-    }, [currentUser, getAuthHeaders]);
+    }, [currentUser]);
 
     useEffect(() => {
         fetchPropertiesAndFavorites();
@@ -370,31 +325,26 @@ const PropertiesView = () => {
 
         try {
             if (isFavorited) {
-                await fetch(`http://localhost:3001/api/favorites/${propertyId}`, { method: 'DELETE', headers: getAuthHeaders() });
+                await api.delete(`/api/favorites/${propertyId}`);
                 newFavorites.delete(propertyId);
             } else {
-                await fetch('http://localhost:3001/api/favorites', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-                    body: JSON.stringify({ property_id: propertyId })
-                });
+                await api.post('/api/favorites', { property_id: propertyId });
                 newFavorites.add(propertyId);
             }
             setFavorites(newFavorites);
         } catch (err) {
-            alert(`Error updating favorite: ${err.message}`);
+            alert(`Error updating favorite: ${err.response?.data?.message}`);
         }
     };
 
     const handleDeleteProperty = async (propertyId, propertyTitle) => {
         if (!window.confirm(`Are you sure you want to delete "${propertyTitle}"?`)) return;
         try {
-            const response = await fetch(`http://localhost:3001/api/properties/${propertyId}`, { method: 'DELETE', headers: getAuthHeaders() });
-            if (!response.ok) { const data = await response.json(); throw new Error(data.message || 'Failed to delete property'); }
+            await api.delete(`/api/properties/${propertyId}`);
             alert('Property deleted successfully!');
             setProperties(prev => prev.filter(p => p._id !== propertyId));
         } catch (err) {
-            alert(err.message);
+            alert(err.response?.data?.message || 'Failed to delete property.');
         }
     };
 
@@ -480,9 +430,10 @@ const PropertiesView = () => {
         </div>
     );
 };
+
 const PropertyDetailsView = () => {
     const navigate = useNavigate();
-    const { currentUser, getAuthHeaders } = useAuth();
+    const { currentUser } = useAuth();
     const { propertyId } = useParams();
     const [property, setProperty] = useState(null);
     const [reviews, setReviews] = useState([]);
@@ -501,17 +452,14 @@ const PropertyDetailsView = () => {
         }
         setLoading(true);
         try {
-            const propResponse = await fetch(`http://localhost:3001/api/properties/${propertyId}`);
-            const propData = await propResponse.json();
-            if (!propResponse.ok) throw new Error(propData.message || 'Failed to fetch details.');
-            setProperty(propData);
-            if(propData.images?.length > 0) setSelectedImage(propData.images[0]);
-            const revResponse = await fetch(`http://localhost:3001/api/properties/${propertyId}/reviews`);
-            const revData = await revResponse.json();
-            if (!revResponse.ok) throw new Error(revData.message || 'Failed to fetch reviews.');
-            setReviews(revData);
+            const propResponse = await api.get(`/api/properties/${propertyId}`);
+            setProperty(propResponse.data);
+            if(propResponse.data.images?.length > 0) setSelectedImage(propResponse.data.images[0]);
+
+            const revResponse = await api.get(`/api/properties/${propertyId}/reviews`);
+            setReviews(revResponse.data);
         } catch (err) {
-            setError(err.message);
+            setError(err.response?.data?.message || 'Failed to fetch details.');
         } finally {
             setLoading(false);
         }
@@ -523,39 +471,27 @@ const PropertyDetailsView = () => {
 
     useEffect(() => {
         if (propertyId && propertyId !== 'undefined' && !viewRecorded.current) {
-            fetch(`http://localhost:3001/api/properties/${propertyId}/view`, { method: 'POST' }).catch(err => console.error("Failed to record view:", err));
+            api.post(`/api/properties/${propertyId}/view`).catch(err => console.error("Failed to record view:", err));
             viewRecorded.current = true;
         }
     }, [propertyId]);
 
-
     const handleReviewSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch('http://localhost:3001/api/reviews', {
-                method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-                body: JSON.stringify({ property_id: propertyId, rating: newRating, comment: newReviewText })
-            });
-            if (!response.ok) { const data = await response.json(); throw new Error(data.message || 'Failed to submit review.'); }
-            // Re-fetch after submitting
-            const revResponse = await fetch(`http://localhost:3001/api/properties/${propertyId}/reviews`);
-            const revData = await revResponse.json();
-            setReviews(revData);
+            await api.post('/api/reviews', { property_id: propertyId, rating: newRating, comment: newReviewText });
+            const revResponse = await api.get(`/api/properties/${propertyId}/reviews`);
+            setReviews(revResponse.data);
             setNewReviewText("");
             setNewRating(0);
-        } catch (err) { alert(`Error: ${err.message}`); }
+        } catch (err) { alert(`Error: ${err.response?.data?.message}`); }
     };
 
     const handleContact = async () => {
         try {
-            const response = await fetch('http://localhost:3001/api/conversations', {
-                method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-                body: JSON.stringify({ property_id: property._id, landlord_id: property.landlord_id })
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || "Could not start conversation.");
-            navigate(`/messages/${data.conversationId}`);
-        } catch (err) { alert(err.message); }
+            const response = await api.post('/api/conversations', { property_id: property._id, landlord_id: property.landlord_id });
+            navigate(`/messages/${response.data.conversationId}`);
+        } catch (err) { alert(err.response?.data?.message || "Could not start conversation."); }
     };
 
     if (loading) return <div className="min-h-screen flex justify-center items-center"><p>Loading...</p></div>;
@@ -614,9 +550,10 @@ const PropertyDetailsView = () => {
         </div>
     );
 };
+
 const AddPropertyView = () => {
     const navigate = useNavigate();
-    const { currentUser, getAuthHeaders } = useAuth();
+    const { currentUser } = useAuth();
     const [propertyDetails, setPropertyDetails] = useState({ title: '', description: '', address: '', city: '', price: '', property_type: 'apartment', bedrooms: '', bathrooms: '', amenities: '', lat: '', lng: '' });
     const [imageFiles, setImageFiles] = useState([]);
     const [message, setMessage] = useState('');
@@ -640,13 +577,14 @@ const AddPropertyView = () => {
             formData.append('images', imageFiles[i]);
         }
         try {
-            const response = await fetch('http://localhost:3001/api/properties', { method: 'POST', headers: { ...getAuthHeaders() }, body: formData });
-            if (!response.ok) { const data = await response.json(); throw new Error(data.message || 'Failed to add property.'); }
+            await api.post('/api/properties', formData);
             setMessage('Property added successfully!');
             setPropertyDetails({ title: '', description: '', address: '', city: '', price: '', property_type: 'apartment', bedrooms: '', bathrooms: '', amenities: '', lat: '', lng: '' });
             setImageFiles([]);
             document.getElementById('image-input').value = '';
-        } catch (err) { setError(err.message); }
+        } catch (err) { 
+            setError(err.response?.data?.message || 'Failed to add property.'); 
+        }
         finally { setSubmitLoading(false); }
     };
 
@@ -686,10 +624,11 @@ const AddPropertyView = () => {
         </div>
     );
 };
+
 const EditPropertyView = () => {
     const { propertyId } = useParams();
     const navigate = useNavigate();
-    const { currentUser, getAuthHeaders } = useAuth();
+    const { currentUser } = useAuth();
     const [propertyDetails, setPropertyDetails] = useState(null);
     const [imageFiles, setImageFiles] = useState([]);
     const [message, setMessage] = useState('');
@@ -700,12 +639,13 @@ const EditPropertyView = () => {
         const fetchProperty = async () => {
             if (!propertyId) return;
             try {
-                const response = await fetch(`http://localhost:3001/api/properties/${propertyId}`);
-                const data = await response.json();
-                if (!response.ok) throw new Error('Failed to fetch property details.');
-                if (currentUser && String(data.landlord_id) !== String(currentUser.uid)) { navigate('/'); }
-                else { setPropertyDetails(data); }
-            } catch (err) { setError(err.message); }
+                const response = await api.get(`/api/properties/${propertyId}`);
+                if (currentUser && String(response.data.landlord_id) !== String(currentUser.uid)) {
+                    navigate('/');
+                } else {
+                    setPropertyDetails(response.data);
+                }
+            } catch (err) { setError(err.response?.data?.message || 'Failed to fetch property details.'); }
         };
         if (currentUser) fetchProperty();
     }, [propertyId, currentUser, navigate]);
@@ -724,10 +664,9 @@ const EditPropertyView = () => {
             formData.append('images', imageFiles[i]);
         }
         try {
-            const response = await fetch(`http://localhost:3001/api/properties/${propertyId}`, { method: 'PUT', headers: { ...getAuthHeaders() }, body: formData });
-            if (!response.ok) { const data = await response.json(); throw new Error(data.message || 'Failed to update property.'); }
+            await api.put(`/api/properties/${propertyId}`, formData);
             setMessage('Property updated successfully!');
-        } catch (err) { setError(err.message); }
+        } catch (err) { setError(err.response?.data?.message || 'Failed to update property.'); }
         finally { setSubmitLoading(false); }
     };
 
@@ -767,8 +706,9 @@ const EditPropertyView = () => {
         </div>
     );
 };
+
 const MessagesView = () => {
-    const { currentUser, getAuthHeaders } = useAuth();
+    const { currentUser } = useAuth();
     const [conversations, setConversations] = useState([]);
     const [selectedConversation, setSelectedConversation] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -782,35 +722,31 @@ const MessagesView = () => {
     const fetchMessages = useCallback(async (convoId) => {
         if (!convoId) return;
         try {
-            const response = await fetch(`http://localhost:3001/api/conversations/${convoId}/messages`, { headers: getAuthHeaders() });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Failed to fetch messages.');
-            setMessages(data);
-        } catch (err) { setError(err.message); }
-    }, [getAuthHeaders]);
+            const response = await api.get(`/api/conversations/${convoId}/messages`);
+            setMessages(response.data);
+        } catch (err) { setError(err.response?.data?.message || 'Failed to fetch messages.'); }
+    }, []);
 
     useEffect(() => {
         const fetchConversations = async () => {
             setLoading(true);
             try {
-                const response = await fetch('http://localhost:3001/api/conversations', { headers: getAuthHeaders() });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.message || 'Failed to fetch conversations.');
-                setConversations(data);
+                const response = await api.get('/api/conversations');
+                setConversations(response.data);
                 if (conversationId) {
-                    const activeConvo = data.find(c => c._id === conversationId);
+                    const activeConvo = response.data.find(c => c._id === conversationId);
                     if (activeConvo) setSelectedConversation(activeConvo);
                 }
-            } catch (err) { setError(err.message); }
+            } catch (err) { setError(err.response?.data?.message || 'Failed to fetch conversations.'); }
             finally { setLoading(false); }
         };
         fetchConversations();
-    }, [conversationId, getAuthHeaders]);
+    }, [conversationId]);
 
     useEffect(() => {
         if (!selectedConversation) return;
         fetchMessages(selectedConversation._id);
-        ws.current = new WebSocket('ws://localhost:3001');
+        ws.current = new WebSocket(WEBSOCKET_URL);
         ws.current.onopen = () => {
             const token = localStorage.getItem("token");
             ws.current.send(JSON.stringify({ type: 'auth', token, conversationId: selectedConversation._id }));
@@ -888,8 +824,9 @@ const MessagesView = () => {
         </div>
     );
 };
+
 const FavoritesView = () => {
-    const { getAuthHeaders } = useAuth();
+    const { currentUser } = useAuth();
     const [favoriteProperties, setFavoriteProperties] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -899,18 +836,16 @@ const FavoritesView = () => {
         const fetchFavorites = async () => {
             setLoading(true);
             try {
-                const response = await fetch('http://localhost:3001/api/favorites', { headers: getAuthHeaders() });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.message || 'Failed to fetch favorites.');
-                setFavoriteProperties(data);
+                const response = await api.get('/api/favorites');
+                setFavoriteProperties(response.data);
             } catch (err) {
-                setError(err.message);
+                setError(err.response?.data?.message || 'Failed to fetch favorites.');
             } finally {
                 setLoading(false);
             }
         };
-        if (getAuthHeaders().Authorization) fetchFavorites();
-    }, [getAuthHeaders]);
+        if (currentUser) fetchFavorites();
+    }, [currentUser]);
 
     if (loading) return <div className="min-h-screen flex justify-center items-center"><p>Loading your favorite properties...</p></div>;
     if (error) return <div className="min-h-screen flex justify-center items-center"><p className="text-xl text-red-500">{error}</p></div>;
@@ -939,8 +874,9 @@ const FavoritesView = () => {
         </div>
     );
 };
+
 const DashboardView = () => {
-    const { currentUser, getAuthHeaders, loading } = useAuth();
+    const { currentUser, loading } = useAuth();
     const navigate = useNavigate();
     const [stats, setStats] = useState(null);
     const [localLoading, setLocalLoading] = useState(true);
@@ -954,22 +890,20 @@ const DashboardView = () => {
             }
             setLocalLoading(true);
             try {
-                const response = await fetch('http://localhost:3001/api/dashboard/stats', { headers: getAuthHeaders() });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.message || 'Failed to fetch dashboard stats.');
-                setStats(data);
+                const response = await api.get('/api/dashboard/stats');
+                setStats(response.data);
             } catch (err) {
-                setError(err.message);
+                setError(err.response?.data?.message || 'Failed to fetch dashboard stats.');
             } finally {
                 setLocalLoading(false);
             }
         };
         if (currentUser) {
             fetchStats();
-        } else if (!loading) { // If auth is done loading and there's no user
+        } else if (!loading) { 
             navigate('/login');
         }
-    }, [currentUser, navigate, getAuthHeaders, loading]);
+    }, [currentUser, navigate, loading]);
 
     if (!currentUser) return null;
     if (localLoading) return <div className="min-h-screen flex justify-center items-center"><p>Loading dashboard...</p></div>;
@@ -1023,9 +957,8 @@ const DashboardView = () => {
     );
 };
 
-
 // --- Main App Component ---
-export default function App() {
+const App = () => {
     return (
         <AuthProvider>
             <BrowserRouter>
@@ -1049,3 +982,5 @@ export default function App() {
         </AuthProvider>
     );
 }
+
+export default App;
