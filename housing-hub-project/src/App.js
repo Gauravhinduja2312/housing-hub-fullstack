@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, Outlet, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, Outlet } from 'react-router-dom';
 import { Home, LogIn, UserPlus, Building, Menu, X, PlusCircle, House, MapPin, DollarSign, Bed, Bath, Tag, Image, Search, Filter, ArrowLeft, Edit, Trash2, MessageSquare, Send, Heart, Star, LayoutDashboard, Eye } from 'lucide-react';
 import api, { WEBSOCKET_URL } from './api'; // Import our new api instance and WebSocket URL
 
@@ -32,6 +32,7 @@ export const AuthProvider = ({ children }) => {
         setCurrentUser(null);
     };
 
+    // The getAuthHeaders function is no longer needed as the api.js interceptor handles it.
     return (
         <AuthContext.Provider value={{ currentUser, setCurrentUser, logout, loading }}>
             {!loading && children}
@@ -129,7 +130,7 @@ const HomeView = () => {
         <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl w-full bg-white p-12 rounded-2xl shadow-2xl border border-gray-200 text-center">
                 <h1 className="text-5xl font-extrabold text-gray-800 mb-4">Welcome to <span className="text-indigo-600">Housing Hub</span></h1>
-                <p className="text-xl text-gray-600 mb-8">Your one-stop solution for finding the perfect student accommodation.</p>
+                <p className="text-xl text-gray-600 mb-8">Your one-step solution for finding the perfect student accommodation.</p>
                 {currentUser ? (
                     <div>
                         <p className="text-xl text-gray-700 mb-2">You are logged in as <span className="font-bold text-indigo-700">{currentUser.email}</span>.</p>
@@ -235,10 +236,8 @@ const Signup = () => {
         setError('');
         setLoading(true);
         try {
-            // The backend /api/verify-otp route only needs email and otp
-            const response = await api.post("/api/verify-otp", { email, otp });
+            const response = await api.post("/api/verify-otp", { email, otp, password, userType });
             const data = response.data;
-
             const userToStore = { email: data.email, uid: data.userId, userType: data.userType };
             setCurrentUser(userToStore);
             localStorage.setItem("token", data.token);
@@ -287,7 +286,6 @@ const Signup = () => {
         </div>
     );
 };
-
 const PropertiesView = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
@@ -481,12 +479,10 @@ const PropertyDetailsView = () => {
         }
     }, [propertyId]);
 
-
     const handleReviewSubmit = async (e) => {
         e.preventDefault();
         try {
             await api.post('/api/reviews', { property_id: propertyId, rating: newRating, comment: newReviewText });
-            // Re-fetch after submitting
             const revResponse = await api.get(`/api/properties/${propertyId}/reviews`);
             setReviews(revResponse.data);
             setNewReviewText("");
@@ -547,7 +543,7 @@ const PropertyDetailsView = () => {
                     <div className="space-y-6">
                         {reviews.length > 0 ? reviews.map(review => (
                             <div key={review._id} className="border-b pb-4">
-                                <div className="flex items-center mb-2"><StarRating rating={review.rating} isInteractive={false} /><p className="ml-4 font-bold">{review.student_email}</p></div>
+                                <div className="flex items-center mb-2"><StarRating rating={review.rating} isInteractive={false} /><p className="ml-4 font-bold">{review.user_id.email}</p></div>
                                 <p className="text-gray-700">{review.comment}</p>
                             </div>
                         )) : <p>No reviews yet. Be the first to leave one!</p>}
@@ -753,7 +749,7 @@ const MessagesView = () => {
     useEffect(() => {
         if (!selectedConversation) return;
         fetchMessages(selectedConversation._id);
-        ws.current = new WebSocket(WEBSOCKET_URL); // Using the dynamic URL
+        ws.current = new WebSocket(WEBSOCKET_URL);
         ws.current.onopen = () => {
             const token = localStorage.getItem("token");
             ws.current.send(JSON.stringify({ type: 'auth', token, conversationId: selectedConversation._id }));
@@ -905,15 +901,15 @@ const DashboardView = () => {
                 setLocalLoading(false);
             }
         };
-        if (currentUser) {
+        // Run fetchStats only when auth is confirmed and there is a user
+        if (!loading && currentUser) {
             fetchStats();
-        } else if (!loading) { 
+        } else if (!loading && !currentUser) { // If auth is done and still no user
             navigate('/login');
         }
     }, [currentUser, navigate, loading]);
 
-    if (!currentUser) return null;
-    if (localLoading) return <div className="min-h-screen flex justify-center items-center"><p>Loading dashboard...</p></div>;
+    if (!currentUser || localLoading) return <div className="min-h-screen flex justify-center items-center"><p>Loading dashboard...</p></div>;
     if (error) return <div className="min-h-screen flex justify-center items-center"><p className="text-red-500">{error}</p></div>;
     if (!stats) return null;
 
@@ -965,7 +961,7 @@ const DashboardView = () => {
 };
 
 // --- Main App Component ---
-const App = () => {
+export default function App() {
     return (
         <AuthProvider>
             <BrowserRouter>
@@ -990,4 +986,3 @@ const App = () => {
     );
 }
 
-export default App;
