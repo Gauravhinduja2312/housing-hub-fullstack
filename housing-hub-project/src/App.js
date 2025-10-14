@@ -1,7 +1,35 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, Outlet } from 'react-router-dom';
 import { Home, LogIn, UserPlus, Building, Menu, X, PlusCircle, House, MapPin, DollarSign, Bed, Bath, Tag, Image, Search, Filter, ArrowLeft, Edit, Trash2, MessageSquare, Send, Heart, Star, LayoutDashboard, Eye } from 'lucide-react';
-import api, { WEBSOCKET_URL } from './api'; // Import our new api instance and WebSocket URL
+import axios from 'axios';
+
+// --- API Configuration ---
+const API_URL = 'http://localhost:3001';
+const WEBSOCKET_URL = 'ws://localhost:3001';
+
+const api = axios.create({
+    baseURL: API_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        if (config.data instanceof FormData) {
+            config.headers['Content-Type'] = 'multipart/form-data';
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
 
 // --- Auth Context ---
 const AuthContext = createContext();
@@ -200,6 +228,7 @@ const Login = () => {
     );
 };
 
+// UPDATED Signup COMPONENT
 const Signup = () => {
     const navigate = useNavigate();
     const { setCurrentUser } = useAuth();
@@ -224,7 +253,7 @@ const Signup = () => {
             const userToStore = { email: data.email, uid: data.userId, userType: data.userType };
             setCurrentUser(userToStore);
             localStorage.setItem("token", data.token);
-            navigate("/");
+            navigate("/"); // Redirect to home on successful signup
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to create account.');
         } finally {
@@ -255,6 +284,7 @@ const Signup = () => {
     );
 };
 
+// --- Other Page Components ---
 const PropertiesView = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
@@ -957,4 +987,3 @@ export default function App() {
         </AuthProvider>
     );
 }
-
