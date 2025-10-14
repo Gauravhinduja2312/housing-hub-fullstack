@@ -32,7 +32,6 @@ export const AuthProvider = ({ children }) => {
         setCurrentUser(null);
     };
 
-    // The getAuthHeaders function is no longer needed as the api.js interceptor handles it.
     return (
         <AuthContext.Provider value={{ currentUser, setCurrentUser, logout, loading }}>
             {!loading && children}
@@ -204,12 +203,10 @@ const Login = () => {
 const Signup = () => {
     const navigate = useNavigate();
     const { setCurrentUser } = useAuth();
-    const [signupStep, setSignupStep] = useState(1);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [userType, setUserType] = useState('student');
-    const [otp, setOtp] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -222,29 +219,14 @@ const Signup = () => {
         }
         setLoading(true);
         try {
-            await api.post("/api/signup", { email, password, userType });
-            setSignupStep(2);
-        } catch (err) {
-            setError(err.response?.data?.message || 'Failed to send OTP.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleVerifyOtp = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-        try {
-            const response = await api.post("/api/verify-otp", { email, otp, password, userType });
+            const response = await api.post("/api/signup", { email, password, userType });
             const data = response.data;
             const userToStore = { email: data.email, uid: data.userId, userType: data.userType };
             setCurrentUser(userToStore);
             localStorage.setItem("token", data.token);
             navigate("/");
-
         } catch (err) {
-            setError(err.response?.data?.message || 'OTP verification failed.');
+            setError(err.response?.data?.message || 'Failed to create account.');
         } finally {
             setLoading(false);
         }
@@ -253,39 +235,26 @@ const Signup = () => {
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center py-12 px-4">
             <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-2xl border">
-                {signupStep === 1 ? (
-                    <>
-                        <h2 className="text-4xl font-extrabold text-center text-gray-800 mb-8">Create Your Account</h2>
-                        {error && <div className="bg-red-100 text-red-700 p-3 rounded-lg mb-6">{error}</div>}
-                        <form onSubmit={handleSignupSubmit} className="space-y-6">
-                            <div><label className="block text-lg font-medium mb-2">Email</label><input type="email" required className="block w-full p-3 border rounded-lg" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-                            <div><label className="block text-lg font-medium mb-2">Password</label><input type="password" required className="block w-full p-3 border rounded-lg" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-                            <div><label className="block text-lg font-medium mb-2">Confirm Password</label><input type="password" required className="block w-full p-3 border rounded-lg" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></div>
-                            <div>
-                                <label className="block text-lg font-medium mb-2">I am a:</label>
-                                <div className="flex space-x-4">
-                                    <label className="inline-flex items-center"><input type="radio" className="form-radio h-5 w-5 text-indigo-600" name="userType" value="student" checked={userType === 'student'} onChange={(e) => setUserType(e.target.value)} /><span className="ml-2 text-lg">Student</span></label>
-                                    <label className="inline-flex items-center"><input type="radio" className="form-radio h-5 w-5 text-indigo-600" name="userType" value="landlord" checked={userType === 'landlord'} onChange={(e) => setUserType(e.target.value)} /><span className="ml-2 text-lg">Landlord</span></label>
-                                </div>
-                            </div>
-                            <div><button type="submit" disabled={loading} className="w-full flex justify-center py-3 px-4 text-lg font-semibold rounded-full text-white bg-green-600 hover:bg-green-700">{loading ? 'Sending OTP...' : 'Sign Up'}</button></div>
-                        </form>
-                    </>
-                ) : (
-                    <>
-                        <h2 className="text-4xl font-extrabold text-center text-gray-800 mb-8">Verify Your Email</h2>
-                        <p className="text-center text-gray-600 mb-6">An OTP has been sent to {email}. Please enter it below.</p>
-                        {error && <div className="bg-red-100 text-red-700 p-3 rounded-lg mb-6">{error}</div>}
-                        <form onSubmit={handleVerifyOtp} className="space-y-6">
-                            <div><label className="block text-lg font-medium mb-2">OTP Code</label><input type="text" required className="block w-full p-3 border rounded-lg text-center tracking-[1em]" value={otp} onChange={(e) => setOtp(e.target.value)} maxLength="6" /></div>
-                            <div><button type="submit" disabled={loading} className="w-full flex justify-center py-3 px-4 text-lg font-semibold rounded-full text-white bg-indigo-600 hover:bg-indigo-700">{loading ? 'Verifying...' : 'Verify & Create Account'}</button></div>
-                        </form>
-                    </>
-                )}
+                <h2 className="text-4xl font-extrabold text-center text-gray-800 mb-8">Create Your Account</h2>
+                {error && <div className="bg-red-100 text-red-700 p-3 rounded-lg mb-6">{error}</div>}
+                <form onSubmit={handleSignupSubmit} className="space-y-6">
+                    <div><label className="block text-lg font-medium mb-2">Email</label><input type="email" required className="block w-full p-3 border rounded-lg" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+                    <div><label className="block text-lg font-medium mb-2">Password</label><input type="password" required className="block w-full p-3 border rounded-lg" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+                    <div><label className="block text-lg font-medium mb-2">Confirm Password</label><input type="password" required className="block w-full p-3 border rounded-lg" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></div>
+                    <div>
+                        <label className="block text-lg font-medium mb-2">I am a:</label>
+                        <div className="flex space-x-4">
+                            <label className="inline-flex items-center"><input type="radio" className="form-radio h-5 w-5 text-indigo-600" name="userType" value="student" checked={userType === 'student'} onChange={(e) => setUserType(e.target.value)} /><span className="ml-2 text-lg">Student</span></label>
+                            <label className="inline-flex items-center"><input type="radio" className="form-radio h-5 w-5 text-indigo-600" name="userType" value="landlord" checked={userType === 'landlord'} onChange={(e) => setUserType(e.target.value)} /><span className="ml-2 text-lg">Landlord</span></label>
+                        </div>
+                    </div>
+                    <div><button type="submit" disabled={loading} className="w-full flex justify-center py-3 px-4 text-lg font-semibold rounded-full text-white bg-green-600 hover:bg-green-700">{loading ? 'Creating Account...' : 'Sign Up'}</button></div>
+                </form>
             </div>
         </div>
     );
 };
+
 const PropertiesView = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
@@ -573,7 +542,11 @@ const AddPropertyView = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage(''); setError(''); setSubmitLoading(true);
-        if (!currentUser?.uid) { setError('You must be logged in.'); setSubmitLoading(false); return; }
+        if (!currentUser?.uid) { 
+            setError('You must be logged in.'); 
+            setSubmitLoading(false);
+            return;
+        }
         const formData = new FormData();
         Object.keys(propertyDetails).forEach(key => formData.append(key, propertyDetails[key]));
         for (let i = 0; i < imageFiles.length; i++) {
@@ -901,10 +874,9 @@ const DashboardView = () => {
                 setLocalLoading(false);
             }
         };
-        // Run fetchStats only when auth is confirmed and there is a user
         if (!loading && currentUser) {
             fetchStats();
-        } else if (!loading && !currentUser) { // If auth is done and still no user
+        } else if (!loading && !currentUser) { 
             navigate('/login');
         }
     }, [currentUser, navigate, loading]);
