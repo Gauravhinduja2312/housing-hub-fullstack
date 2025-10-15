@@ -1,15 +1,25 @@
 import axios from 'axios';
 
+// ===================================================================================
+// IMPORTANT: DEPLOYMENT CONFIGURATION
+// ===================================================================================
+// You MUST replace the placeholder URL below with your actual Render backend URL.
+// 1. Go to your Render Dashboard.
+// 2. Find your backend service (e.g., "housing-hub-backend").
+// 3. Copy the URL (it will look something like: https://housing-hub-backend-xxxx.onrender.com).
+// 4. Paste it here to replace the placeholder.
+// ===================================================================================
+
+const RENDER_BACKEND_URL = 'https://housing-hub-backend.onrender.com/'; 
+
 // Dynamically set the base URL for API requests
-// This will use your Render URL in production and localhost for development
 const API_URL = process.env.NODE_ENV === 'production'
-  ? 'https://your-render-backend-url.onrender.com' // <-- IMPORTANT: Replace with your actual Render backend URL
+  ? RENDER_BACKEND_URL
   : 'http://localhost:3001';
 
 // Dynamically set the WebSocket URL
-// Use 'wss://' for secure WebSockets in production and 'ws://' for local development
 export const WEBSOCKET_URL = process.env.NODE_ENV === 'production'
-  ? 'wss://your-render-backend-url.onrender.com' // <-- IMPORTANT: Replace with your actual Render backend URL
+  ? RENDER_BACKEND_URL.replace(/^http/, 'ws') // Converts https:// to wss://
   : 'ws://localhost:3001';
 
 // Create an Axios instance with the base URL
@@ -33,3 +43,4 @@ api.interceptors.request.use(
 );
 
 export default api;
+
