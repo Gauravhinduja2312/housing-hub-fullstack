@@ -320,24 +320,6 @@ const PropertiesView = () => {
         fetchPropertiesAndFavorites();
     }, [fetchPropertiesAndFavorites]);
 
-    const handleToggleFavorite = async (propertyId) => {
-        const isFavorited = favorites.has(propertyId);
-        const newFavorites = new Set(favorites);
-
-        try {
-            if (isFavorited) {
-                await api.delete(`/api/favorites/${propertyId}`);
-                newFavorites.delete(propertyId);
-            } else {
-                await api.post('/api/favorites', { property_id: propertyId });
-                newFavorites.add(propertyId);
-            }
-            setFavorites(newFavorites);
-        } catch (err) {
-            alert(`Error updating favorite: ${err.response?.data?.message}`);
-        }
-    };
-
     const handleDeleteProperty = async (propertyId, propertyTitle) => {
         if (!window.confirm(`Are you sure you want to delete "${propertyTitle}"?`)) return;
         try {
@@ -732,7 +714,7 @@ const EditPropertyView = () => {
     );
 };
 
-// --- UPDATED MessagesView Component with Safeguard ---
+// --- UPDATED MessagesView Component ---
 const MessagesView = () => {
     const { currentUser } = useAuth();
     const [conversations, setConversations] = useState([]);
@@ -758,12 +740,10 @@ const MessagesView = () => {
             setLoading(true);
             try {
                 const response = await api.get('/api/conversations');
-                // **THIS IS THE FIX**: Filter out conversations where the property is null
-                const validConversations = response.data.filter(c => c.property_id);
-                setConversations(validConversations);
+                setConversations(response.data); // The backend now sends only valid conversations
 
                 if (conversationId) {
-                    const activeConvo = validConversations.find(c => c._id === conversationId);
+                    const activeConvo = response.data.find(c => c._id === conversationId);
                     if (activeConvo) setSelectedConversation(activeConvo);
                 }
             } catch (err) { setError(err.response?.data?.message || 'Failed to fetch conversations.'); }
