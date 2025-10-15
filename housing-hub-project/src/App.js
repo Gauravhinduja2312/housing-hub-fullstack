@@ -1,7 +1,35 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, Outlet } from 'react-router-dom';
-import { Home, LogIn, UserPlus, Building, Menu, X, PlusCircle, House, MapPin, DollarSign, Bed, Bath, Tag, Image, Search, Filter, ArrowLeft, Edit, Trash2, MessageSquare, Send, Heart, Star, LayoutDashboard, Eye } from 'lucide-react';
-import api, { WEBSOCKET_URL } from './api'; // Import our new api instance and WebSocket URL
+import { Home, LogIn, UserPlus, Building, Menu, X, PlusCircle, House, MapPin, DollarSign, Bed, Bath, Tag, Image, Search, Filter, ArrowLeft, Edit, Trash2, MessageSquare, Send, Heart, Star, LayoutDashboard, Eye, ShieldAlert } from 'lucide-react';
+import axios from 'axios';
+
+// --- API Configuration ---
+const API_URL = 'http://localhost:3001';
+const WEBSOCKET_URL = 'ws://localhost:3001';
+
+const api = axios.create({
+    baseURL: API_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        if (config.data instanceof FormData) {
+            config.headers['Content-Type'] = 'multipart/form-data';
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
 
 // --- Auth Context ---
 const AuthContext = createContext();
@@ -255,6 +283,7 @@ const Signup = () => {
     );
 };
 
+
 const PropertiesView = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
@@ -317,6 +346,17 @@ const PropertiesView = () => {
             setProperties(prev => prev.filter(p => p._id !== propertyId));
         } catch (err) {
             alert(err.response?.data?.message || 'Failed to delete property.');
+        }
+    };
+    
+    const handleAdminDelete = async (propertyId, propertyTitle) => {
+        if (!window.confirm(`ADMIN ACTION: Are you sure you want to permanently delete "${propertyTitle}"? This cannot be undone.`)) return;
+        try {
+            await api.delete(`/api/properties/${propertyId}/admin-delete`);
+            alert('Property deleted successfully by admin!');
+            setProperties(prev => prev.filter(p => p._id !== propertyId));
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to delete property via admin route.');
         }
     };
 
@@ -387,12 +427,20 @@ const PropertiesView = () => {
                                     <p className="text-indigo-600 text-2xl font-bold mb-4">₹{property.price.toLocaleString()}</p>
                                     <div className="flex items-center text-gray-600 mb-4"><MapPin size={18} className="mr-2" /><span>{property.address}, {property.city}</span></div>
                                     <button onClick={() => navigate(`/properties/${property._id}`)} className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">View Details</button>
+                                    
                                     {currentUser?.userType === 'landlord' && String(currentUser.uid) === String(property.landlord_id) && (
                                         <div className="flex justify-between mt-4">
                                             <Link to={`/edit-property/${property._id}`} className="text-indigo-600 hover:text-indigo-800 flex items-center"><Edit size={16} className="mr-1" /> Edit</Link>
                                             <button onClick={() => handleDeleteProperty(property._id, property.title)} className="text-red-600 hover:text-red-800 flex items-center"><Trash2 size={16} className="mr-1" /> Delete</button>
                                         </div>
                                     )}
+
+                                    <div className="mt-4 pt-4 border-t border-gray-200">
+                                         <button onClick={() => handleAdminDelete(property._id, property.title)} className="w-full flex items-center justify-center text-sm bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+                                             <ShieldAlert size={16} className="mr-2" /> Admin Delete
+                                         </button>
+                                    </div>
+
                                 </div>
                             </div>
                         ))
@@ -402,6 +450,7 @@ const PropertiesView = () => {
         </div>
     );
 };
+
 
 const PropertyDetailsView = () => {
     const navigate = useNavigate();
@@ -683,6 +732,7 @@ const EditPropertyView = () => {
     );
 };
 
+// --- UPDATED MessagesView Component with Safeguard ---
 const MessagesView = () => {
     const { currentUser } = useAuth();
     const [conversations, setConversations] = useState([]);
@@ -708,9 +758,12 @@ const MessagesView = () => {
             setLoading(true);
             try {
                 const response = await api.get('/api/conversations');
-                setConversations(response.data);
+                // **THIS IS THE FIX**: Filter out conversations where the property is null
+                const validConversations = response.data.filter(c => c.property_id);
+                setConversations(validConversations);
+
                 if (conversationId) {
-                    const activeConvo = response.data.find(c => c._id === conversationId);
+                    const activeConvo = validConversations.find(c => c._id === conversationId);
                     if (activeConvo) setSelectedConversation(activeConvo);
                 }
             } catch (err) { setError(err.response?.data?.message || 'Failed to fetch conversations.'); }
@@ -766,7 +819,12 @@ const MessagesView = () => {
                 <div className="w-1/3 border-r overflow-y-auto">
                     <h2 className="text-xl font-bold p-4 border-b">Conversations</h2>
                     {conversations.length > 0 ? (
-                        <ul>{conversations.map(convo => (<li key={convo._id} onClick={() => setSelectedConversation(convo)} className={`p-4 cursor-pointer hover:bg-gray-100 ${selectedConversation?._id === convo._id ? 'bg-indigo-100' : ''}`}><p className="font-semibold">{currentUser.userType === 'student' ? convo.landlord_id.email : convo.student_id.email}</p><p className="text-sm text-gray-600 truncate">{convo.property_id.title}</p></li>))}</ul>
+                        <ul>{conversations.map(convo => (
+                            <li key={convo._id} onClick={() => setSelectedConversation(convo)} className={`p-4 cursor-pointer hover:bg-gray-100 ${selectedConversation?._id === convo._id ? 'bg-indigo-100' : ''}`}>
+                                <p className="font-semibold">{currentUser.userType === 'student' ? convo.landlord_id.email : convo.student_id.email}</p>
+                                <p className="text-sm text-gray-600 truncate">{convo.property_id.title}</p>
+                            </li>
+                        ))}</ul>
                     ) : (<p className="p-4 text-gray-500">No conversations yet.</p>)}
                 </div>
                 <div className="w-2/3 flex flex-col">
@@ -800,6 +858,7 @@ const MessagesView = () => {
         </div>
     );
 };
+
 
 const FavoritesView = () => {
     const { currentUser } = useAuth();
