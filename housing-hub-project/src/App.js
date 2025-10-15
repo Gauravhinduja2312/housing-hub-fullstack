@@ -320,6 +320,24 @@ const PropertiesView = () => {
         fetchPropertiesAndFavorites();
     }, [fetchPropertiesAndFavorites]);
 
+    const handleToggleFavorite = async (propertyId) => {
+        const isFavorited = favorites.has(propertyId);
+        const newFavorites = new Set(favorites);
+
+        try {
+            if (isFavorited) {
+                await api.delete(`/api/favorites/${propertyId}`);
+                newFavorites.delete(propertyId);
+            } else {
+                await api.post('/api/favorites', { property_id: propertyId });
+                newFavorites.add(propertyId);
+            }
+            setFavorites(newFavorites);
+        } catch (err) {
+            alert(`Error updating favorite: ${err.response?.data?.message}`);
+        }
+    };
+
     const handleDeleteProperty = async (propertyId, propertyTitle) => {
         if (!window.confirm(`Are you sure you want to delete "${propertyTitle}"?`)) return;
         try {
@@ -799,12 +817,16 @@ const MessagesView = () => {
                 <div className="w-1/3 border-r overflow-y-auto">
                     <h2 className="text-xl font-bold p-4 border-b">Conversations</h2>
                     {conversations.length > 0 ? (
-                        <ul>{conversations.map(convo => (
-                            <li key={convo._id} onClick={() => setSelectedConversation(convo)} className={`p-4 cursor-pointer hover:bg-gray-100 ${selectedConversation?._id === convo._id ? 'bg-indigo-100' : ''}`}>
-                                <p className="font-semibold">{currentUser.userType === 'student' ? convo.landlord_id.email : convo.student_id.email}</p>
-                                <p className="text-sm text-gray-600 truncate">{convo.property_id.title}</p>
-                            </li>
-                        ))}</ul>
+                        <ul>{conversations.map(convo => {
+                            // **THIS IS THE FIX**
+                            if (!convo.property_id) return null; 
+                            return (
+                                <li key={convo._id} onClick={() => setSelectedConversation(convo)} className={`p-4 cursor-pointer hover:bg-gray-100 ${selectedConversation?._id === convo._id ? 'bg-indigo-100' : ''}`}>
+                                    <p className="font-semibold">{currentUser.userType === 'student' ? convo.landlord_id.email : convo.student_id.email}</p>
+                                    <p className="text-sm text-gray-600 truncate">{convo.property_id.title}</p>
+                                </li>
+                            );
+                        })}</ul>
                     ) : (<p className="p-4 text-gray-500">No conversations yet.</p>)}
                 </div>
                 <div className="w-2/3 flex flex-col">
@@ -812,7 +834,8 @@ const MessagesView = () => {
                         <>
                             <div className="p-4 border-b">
                                 <h3 className="font-bold text-lg">{currentUser.userType === 'student' ? selectedConversation.landlord_id.email : selectedConversation.student_id.email}</h3>
-                                <p className="text-sm text-gray-500">{selectedConversation.property_id.title}</p>
+                                {/* Add a check here as well for safety */}
+                                <p className="text-sm text-gray-500">{selectedConversation.property_id?.title}</p>
                             </div>
                             <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
                                 {messages.map(msg => {
@@ -954,7 +977,7 @@ const DashboardView = () => {
                                 {properties.map(prop => (
                                     <tr key={prop._id} className="border-b hover:bg-gray-50">
                                         <td className="p-4 flex items-center">
-                                            <img src={prop.image_url || 'https://placehold.co/100x70'} alt={prop.title} className="w-24 h-16 object-cover rounded-lg mr-4" />
+                                            <img src={prop.image_url || '[https://placehold.co/100x70](https://placehold.co/100x70)'} alt={prop.title} className="w-24 h-16 object-cover rounded-lg mr-4" />
                                             <span className="font-semibold">{prop.title}</span>
                                         </td>
                                         <td className="p-4 text-center">{prop.view_count}</td>
