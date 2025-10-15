@@ -219,7 +219,6 @@ const Signup = () => {
         }
         setLoading(true);
         try {
-            // This now calls the corrected /api/signup route which directly creates a user
             const response = await api.post("/api/signup", { email, password, userType });
             const data = response.data;
             const userToStore = { email: data.email, uid: data.userId, userType: data.userType };
@@ -293,10 +292,6 @@ const PropertiesView = () => {
     }, [fetchPropertiesAndFavorites]);
 
     const handleToggleFavorite = async (propertyId) => {
-        if (!currentUser) {
-            alert("Please log in to save favorites.");
-            return;
-        }
         const isFavorited = favorites.has(propertyId);
         const newFavorites = new Set(favorites);
 
@@ -465,10 +460,6 @@ const PropertyDetailsView = () => {
     };
 
     const handleContact = async () => {
-        if (!currentUser) {
-            alert("Please log in to contact the landlord.");
-            return;
-        }
         try {
             const response = await api.post('/api/conversations', { property_id: property._id, landlord_id: property.landlord_id });
             navigate(`/messages/${response.data.conversationId}`);
@@ -731,37 +722,48 @@ const MessagesView = () => {
     useEffect(() => {
         if (!selectedConversation) return;
 
+        // Fetch initial messages
         fetchMessages(selectedConversation._id);
-
+        
         // Close any existing WebSocket connection before opening a new one
-        if (ws.current) {
+        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
             ws.current.close();
         }
 
+        // Establish new WebSocket connection
         ws.current = new WebSocket(WEBSOCKET_URL);
-        
+
         ws.current.onopen = () => {
-            console.log('WebSocket connected');
+            console.log("WebSocket connected");
             const token = localStorage.getItem("token");
             ws.current.send(JSON.stringify({ type: 'auth', token, conversationId: selectedConversation._id }));
         };
-        
+
         ws.current.onmessage = (event) => {
             const message = JSON.parse(event.data);
             if (message.type === 'newMessage' && message.payload) {
-                setMessages(prev => [...prev, message.payload]);
+                 // FIX: No longer optimistically update. Rely on the server broadcast.
+                 // This ensures the UI is always in sync with the database.
+                fetchMessages(selectedConversation._id);
             }
         };
-        
-        ws.current.onclose = () => console.log('WebSocket disconnected');
-        ws.current.onerror = (error) => console.error('WebSocket Error:', error);
 
-        return () => { 
+        ws.current.onerror = (error) => {
+            console.error("WebSocket error:", error);
+        };
+
+        ws.current.onclose = () => {
+            console.log('WebSocket disconnected');
+        };
+
+        // Cleanup function to close WebSocket connection
+        return () => {
             if (ws.current) {
-                ws.current.close(); 
+                ws.current.close();
             }
         };
     }, [selectedConversation, fetchMessages]);
+
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -780,11 +782,9 @@ const MessagesView = () => {
                 content: newMessage,
             }
         }));
-
-        // FIX: Removed optimistic UI update. The UI will now update only when the message
-        // is received back from the server via the onmessage handler. This ensures consistency.
-        // setMessages(prev => [...prev, { _id: Date.now(), sender_id: currentUser.uid, content: newMessage }]);
         
+        // FIX: No longer optimistically update. The `onmessage` handler will receive the new message
+        // from the server broadcast and trigger a re-fetch.
         setNewMessage("");
     };
 
@@ -797,23 +797,36 @@ const MessagesView = () => {
                 <div className="w-1/3 border-r overflow-y-auto">
                     <h2 className="text-xl font-bold p-4 border-b">Conversations</h2>
                     {conversations.length > 0 ? (
-                        <ul>{conversations.map(convo => (<li key={convo._id} onClick={() => setSelectedConversation(convo)} className={`p-4 cursor-pointer hover:bg-gray-100 ${selectedConversation?._id === convo._id ? 'bg-indigo-100' : ''}`}><p className="font-semibold">{currentUser.userType === 'student' ? convo.landlord_id.email : convo.student_id.email}</p><p className="text-sm text-gray-600 truncate">{convo.property_id.title}</p></li>))}</ul>
+                        <ul>{conversations.map(convo => {
+                            // FIX: Use optional chaining (?.) and provide a fallback to prevent crashes from incomplete data
+                            const otherUser = currentUser.userType === 'student' ? convo.landlord_id?.email : convo.student_id?.email;
+                            const propertyTitle = convo.property_id?.title || 'Property no longer listed';
+
+                            return (
+                                <li key={convo._id} onClick={() => setSelectedConversation(convo)} className={`p-4 cursor-pointer hover:bg-gray-100 ${selectedConversation?._id === convo._id ? 'bg-indigo-100' : ''}`}>
+                                    <p className="font-semibold">{otherUser || 'Unknown User'}</p>
+                                    <p className="text-sm text-gray-600 truncate">{propertyTitle}</p>
+                                </li>
+                            );
+                        })}</ul>
                     ) : (<p className="p-4 text-gray-500">No conversations yet.</p>)}
                 </div>
                 <div className="w-2/3 flex flex-col">
                     {selectedConversation ? (
                         <>
                             <div className="p-4 border-b">
-                                <h3 className="font-bold text-lg">{currentUser.userType === 'student' ? selectedConversation.landlord_id.email : selectedConversation.student_id.email}</h3>
-                                <p className="text-sm text-gray-500">{selectedConversation.property_id.title}</p>
+                                {/* FIX: Use optional chaining here as well */}
+                                <h3 className="font-bold text-lg">{currentUser.userType === 'student' ? selectedConversation.landlord_id?.email : selectedConversation.student_id?.email || 'Unknown User'}</h3>
+                                <p className="text-sm text-gray-500">{selectedConversation.property_id?.title || 'Property no longer listed'}</p>
                             </div>
                             <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
                                 {messages.map(msg => {
                                     const isCurrentUser = String(msg.sender_id) === currentUser.uid;
-                                    const otherUserEmail = currentUser.userType === 'student' ? selectedConversation.landlord_id.email : selectedConversation.student_id.email;
+                                    // FIX: And here
+                                    const otherUserEmail = currentUser.userType === 'student' ? selectedConversation.landlord_id?.email : selectedConversation.student_id?.email;
                                     return (
                                         <div key={msg._id} className={`mb-2 flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'}`}>
-                                            <p className="text-xs text-gray-500 mb-1 px-1">{isCurrentUser ? "You" : otherUserEmail}</p>
+                                            <p className="text-xs text-gray-500 mb-1 px-1">{isCurrentUser ? "You" : (otherUserEmail || 'Unknown User')}</p>
                                             <div className={`rounded-lg px-4 py-2 max-w-md ${isCurrentUser ? 'bg-indigo-500 text-white' : 'bg-gray-200 text-gray-800'}`}>{msg.content}</div>
                                         </div>
                                     );
@@ -831,6 +844,7 @@ const MessagesView = () => {
         </div>
     );
 };
+
 
 const FavoritesView = () => {
     const { currentUser } = useAuth();
@@ -988,3 +1002,4 @@ export default function App() {
         </AuthProvider>
     );
 }
+
