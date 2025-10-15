@@ -219,6 +219,7 @@ const Signup = () => {
         }
         setLoading(true);
         try {
+            // This now calls the corrected /api/signup route which directly creates a user
             const response = await api.post("/api/signup", { email, password, userType });
             const data = response.data;
             const userToStore = { email: data.email, uid: data.userId, userType: data.userType };
@@ -292,6 +293,10 @@ const PropertiesView = () => {
     }, [fetchPropertiesAndFavorites]);
 
     const handleToggleFavorite = async (propertyId) => {
+        if (!currentUser) {
+            alert("Please log in to save favorites.");
+            return;
+        }
         const isFavorited = favorites.has(propertyId);
         const newFavorites = new Set(favorites);
 
@@ -460,6 +465,10 @@ const PropertyDetailsView = () => {
     };
 
     const handleContact = async () => {
+        if (!currentUser) {
+            alert("Please log in to contact the landlord.");
+            return;
+        }
         try {
             const response = await api.post('/api/conversations', { property_id: property._id, landlord_id: property.landlord_id });
             navigate(`/messages/${response.data.conversationId}`);
@@ -721,20 +730,37 @@ const MessagesView = () => {
 
     useEffect(() => {
         if (!selectedConversation) return;
+
         fetchMessages(selectedConversation._id);
+
+        // Close any existing WebSocket connection before opening a new one
+        if (ws.current) {
+            ws.current.close();
+        }
+
         ws.current = new WebSocket(WEBSOCKET_URL);
+        
         ws.current.onopen = () => {
+            console.log('WebSocket connected');
             const token = localStorage.getItem("token");
             ws.current.send(JSON.stringify({ type: 'auth', token, conversationId: selectedConversation._id }));
         };
+        
         ws.current.onmessage = (event) => {
             const message = JSON.parse(event.data);
-            if (message.type === 'newMessage') {
+            if (message.type === 'newMessage' && message.payload) {
                 setMessages(prev => [...prev, message.payload]);
             }
         };
+        
         ws.current.onclose = () => console.log('WebSocket disconnected');
-        return () => { if (ws.current) ws.current.close(); };
+        ws.current.onerror = (error) => console.error('WebSocket Error:', error);
+
+        return () => { 
+            if (ws.current) {
+                ws.current.close(); 
+            }
+        };
     }, [selectedConversation, fetchMessages]);
 
     useEffect(() => {
@@ -746,6 +772,7 @@ const MessagesView = () => {
     const handleSendMessage = (e) => {
         e.preventDefault();
         if (!newMessage.trim() || !ws.current || ws.current.readyState !== WebSocket.OPEN) return;
+        
         ws.current.send(JSON.stringify({
             type: 'message',
             payload: {
@@ -753,7 +780,11 @@ const MessagesView = () => {
                 content: newMessage,
             }
         }));
-        setMessages(prev => [...prev, { _id: Date.now(), sender_id: currentUser.uid, content: newMessage }]);
+
+        // FIX: Removed optimistic UI update. The UI will now update only when the message
+        // is received back from the server via the onmessage handler. This ensures consistency.
+        // setMessages(prev => [...prev, { _id: Date.now(), sender_id: currentUser.uid, content: newMessage }]);
+        
         setNewMessage("");
     };
 
@@ -957,4 +988,3 @@ export default function App() {
         </AuthProvider>
     );
 }
-

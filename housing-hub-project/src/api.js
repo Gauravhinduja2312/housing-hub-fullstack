@@ -1,14 +1,24 @@
 import axios from 'axios';
 
-// Get the base URL from the environment variable (for Render) or default to localhost
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+// Dynamically set the base URL for API requests
+// This will use your Render URL in production and localhost for development
+const API_URL = process.env.NODE_ENV === 'production'
+  ? 'https://your-render-backend-url.onrender.com' // <-- IMPORTANT: Replace with your actual Render backend URL
+  : 'http://localhost:3001';
 
-// Create a new instance of axios with the base URL
+// Dynamically set the WebSocket URL
+// Use 'wss://' for secure WebSockets in production and 'ws://' for local development
+export const WEBSOCKET_URL = process.env.NODE_ENV === 'production'
+  ? 'wss://your-render-backend-url.onrender.com' // <-- IMPORTANT: Replace with your actual Render backend URL
+  : 'ws://localhost:3001';
+
+// Create an Axios instance with the base URL
 const api = axios.create({
-  baseURL: API_URL
+  baseURL: API_URL,
 });
 
-// This automatically adds the user's auth token to every API request
+// Use an interceptor to automatically add the JWT token to all requests
+// This ensures your backend routes are properly authenticated
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -22,8 +32,4 @@ api.interceptors.request.use(
   }
 );
 
-// This creates the correct WebSocket URL for both local and deployed environments
-export const WEBSOCKET_URL = API_URL.replace(/^http/, 'ws');
-
 export default api;
-
